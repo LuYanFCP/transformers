@@ -120,12 +120,12 @@ def _load_deepgemm_kernel():
             "DeepGEMM kernel requires CUDA, but CUDA is not available. Use a different `experts_implementation`."
         )
 
-    # DeepGEMM requires Hopper (SM90) or newer for FP8 WGMMA instructions
+    # kernels-community/deep-gemm is Hopper-only; loads on Blackwell but miscomputes.
     major = torch.cuda.get_device_capability()[0]
-    if major < 9:
+    if major != 9:
         raise ImportError(
-            f"DeepGEMM requires a Hopper (SM90+) or newer GPU, but the current device "
-            f"has compute capability {major}.x. Use a different `experts_implementation`."
+            f"DeepGEMM (kernels-community/deep-gemm) only supports Hopper (SM9.x); "
+            f"current device has compute capability {major}.x. Use a different `experts_implementation`."
         )
 
     # DeepGEMM requires CUDA runtime ≥ 12.3.
