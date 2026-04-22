@@ -120,12 +120,18 @@ def _load_deepgemm_kernel():
             "DeepGEMM kernel requires CUDA, but CUDA is not available. Use a different `experts_implementation`."
         )
 
-    # DeepGEMM requires Hopper (SM90) or newer for FP8 WGMMA instructions
+    # The DeepGEMM build published on the Hugging Face kernel hub
+    # (kernels-community/deep-gemm) targets Hopper-specific FP8 WGMMA instructions and does
+    # not support Blackwell: it loads on SM10.x (e.g. B200) but miscomputes
+    # (finite inputs → NaN outputs). Restrict dispatch to SM9.x so newer GPUs
+    # automatically fall back to Triton.
     major = torch.cuda.get_device_capability()[0]
-    if major < 9:
+    if major != 9:
         raise ImportError(
-            f"DeepGEMM requires a Hopper (SM90+) or newer GPU, but the current device "
-            f"has compute capability {major}.x. Use a different `experts_implementation`."
+            f"The DeepGEMM kernel from the Hugging Face kernel hub "
+            f"(kernels-community/deep-gemm) only supports Hopper (SM9.x); the current device "
+            f"has compute capability {major}.x (e.g. Blackwell/B200 is not supported). "
+            f"Falling back to the Triton finegrained-fp8 kernel."
         )
 
     # DeepGEMM requires CUDA runtime ≥ 12.3.
@@ -597,7 +603,12 @@ class FP8Experts(nn.Module):
         self.hidden_dim = config.hidden_size
         self.activation_scheme = activation_scheme
         self.num_experts = getattr(config, "num_local_experts", config.num_experts)
-        self.intermediate_dim = getattr(config, "moe_intermediate_size", config.intermediate_size)
+        # Cannot use `getattr(..., default)` here: the default is evaluated eagerly and some MoE
+        # configs (e.g. Qwen3_5MoeTextConfig) don't have `intermediate_size` at all.
+        if hasattr(config, "moe_intermediate_size"):
+            self.intermediate_dim = config.moe_intermediate_size
+        else:
+            self.intermediate_dim = config.intermediate_size
         self.act_fn = ACT2FN[getattr(config, "hidden_activation", config.hidden_act)]
 
         if self.has_gate:

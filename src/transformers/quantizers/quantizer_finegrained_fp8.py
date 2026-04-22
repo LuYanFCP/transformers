@@ -101,8 +101,21 @@ class FineGrainedFP8HfQuantizer(HfQuantizer):
     ):
         from ..integrations.finegrained_fp8 import replace_with_fp8_linear
 
+        skip_modules = self.quantization_config.modules_to_not_convert
+        # When a VLM checkpoint is loaded as a text-only model (e.g. AutoModelForCausalLM
+        # unwrapping Qwen3_5MoeConfig to Qwen3_5MoeTextConfig), the checkpoint's skip list
+        # uses the VLM namespace (`model.language_model.*`) while the in-memory model uses
+        # `model.*`. Rewrite the list so `should_convert_module` actually matches.
+        if skip_modules:
+            has_vl_prefix = any(n.startswith("model.language_model.") for n, _ in model.named_modules())
+            if not has_vl_prefix:
+                skip_modules = [
+                    ("model." + n[len("model.language_model."):] if n.startswith("model.language_model.") else n)
+                    for n in skip_modules
+                ]
+
         self.modules_to_not_convert = self.get_modules_to_not_convert(
-            model, self.quantization_config.modules_to_not_convert, model._keep_in_fp32_modules
+            model, skip_modules, model._keep_in_fp32_modules
         )
 
         model = replace_with_fp8_linear(
