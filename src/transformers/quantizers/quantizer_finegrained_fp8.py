@@ -101,8 +101,13 @@ class FineGrainedFP8HfQuantizer(HfQuantizer):
     ):
         from ..integrations.finegrained_fp8 import replace_with_fp8_linear
 
+        # Rewrite VLM-namespaced skip patterns when loading as a text-only model.
+        skip_modules = self.quantization_config.modules_to_not_convert
+        if skip_modules and not any(n.startswith("model.language_model.") for n, _ in model.named_modules()):
+            skip_modules = [n.replace("model.language_model.", "model.", 1) for n in skip_modules]
+
         self.modules_to_not_convert = self.get_modules_to_not_convert(
-            model, self.quantization_config.modules_to_not_convert, model._keep_in_fp32_modules
+            model, skip_modules, model._keep_in_fp32_modules
         )
 
         model = replace_with_fp8_linear(

@@ -383,7 +383,11 @@ class _BaseAutoModelClass:
         elif has_local_code:
             model_class = _get_model_class(config, cls._model_mapping)
             if model_class.config_class == config.sub_configs.get("text_config", None):
+                # Preserve quantization_config across the VLM → text_config unwrap.
+                parent_quantization_config = getattr(config, "quantization_config", None)
                 config = config.get_text_config()
+                if parent_quantization_config is not None and not hasattr(config, "quantization_config"):
+                    config.quantization_config = parent_quantization_config
             return model_class.from_pretrained(
                 pretrained_model_name_or_path, *model_args, config=config, **hub_kwargs, **kwargs
             )

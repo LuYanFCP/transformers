@@ -597,7 +597,11 @@ class FP8Experts(nn.Module):
         self.hidden_dim = config.hidden_size
         self.activation_scheme = activation_scheme
         self.num_experts = getattr(config, "num_local_experts", config.num_experts)
-        self.intermediate_dim = getattr(config, "moe_intermediate_size", config.intermediate_size)
+        # Not `getattr(..., default)`: some configs lack `intermediate_size`.
+        if hasattr(config, "moe_intermediate_size"):
+            self.intermediate_dim = config.moe_intermediate_size
+        else:
+            self.intermediate_dim = config.intermediate_size
         self.act_fn = ACT2FN[getattr(config, "hidden_activation", config.hidden_act)]
 
         if self.has_gate:

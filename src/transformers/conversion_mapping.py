@@ -208,6 +208,19 @@ def _build_checkpoint_conversion_mapping():
             WeightRenaming(
                 source_patterns=r"^model.language_model.", target_patterns=r"^model.(?!(?:language_model.|visual.))"
             ),
+            WeightConverter(
+                source_patterns=[
+                    "mlp.experts.*.gate_proj.weight",
+                    "mlp.experts.*.up_proj.weight",
+                ],
+                target_patterns="mlp.experts.gate_up_proj",
+                operations=[MergeModulelist(dim=0), Concatenate(dim=1)],
+            ),
+            WeightConverter(
+                source_patterns="mlp.experts.*.down_proj.weight",
+                target_patterns="mlp.experts.down_proj",
+                operations=[MergeModulelist(dim=0)],
+            ),
         ],
         "sam3_tracker": [
             WeightRenaming(
